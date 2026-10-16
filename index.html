@@ -117,7 +117,7 @@
   .card-info .date { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; }
   .card-info .date .fr-icon-calendar-line { color: #000091; }
   .card-meta { display: flex; align-items: center; gap: 6px; font-size: .85rem; color: #3A3A3A; }
-  .card-meta i { color: #000091; }
+  .card-meta i, .card-meta .fr-icon-calendar-line { color: #000091; }
   .card-chips { display: flex; flex-wrap: wrap; gap: 4px; font-size: .75rem; color: #3A3A3A; }
   .card-chips b { font-weight: 600; margin-right: 2px; }
 
@@ -456,8 +456,8 @@ function cardHTML(r) {
       ${lieuTxt ? `<div class="card-meta"><i class="ri-map-pin-line"></i><span>${esc(lieuTxt)}</span></div>` : ""}
       ${chips ? `<div class="card-chips" style="flex-direction:column">${chips}</div>` : ""}
       ${etat ? `<span class="badge ${badgeClass}">${esc(etat)}</span>` : ""}
-      ${ouv ? `<div class="card-meta"><i class="ri-calendar-line"></i><span>Ouverture des inscriptions : ${esc(ouv)}</span></div>` : ""}
-      ${clo ? `<div class="card-meta"><i class="ri-calendar-line"></i><span>Clôture des inscriptions : ${esc(clo)}</span></div>` : ""}
+      ${ouv ? `<div class="card-meta"><span class="fr-icon-calendar-line fr-icon--sm" aria-hidden="true"></span><span>Ouverture des inscriptions : ${esc(ouv)}</span></div>` : ""}
+      ${clo ? `<div class="card-meta"><span class="fr-icon-calendar-line fr-icon--sm" aria-hidden="true"></span><span>Clôture des inscriptions : ${esc(clo)}</span></div>` : ""}
       <div class="card-footer">
         ${lien ? `<a href="${esc(lien)}" target="_blank" rel="noopener">Détail et inscription</a>` : "<span></span>"}
       </div>
