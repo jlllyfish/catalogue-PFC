@@ -433,14 +433,15 @@ function cardHTML(r) {
   ].filter(([, v]) => v.length)
    .map(([k, v]) => `<div><b>${k} :</b>${esc(v.join(", "))}</div>`).join("");
 
-  const lieuTxt = [lieu, region && region !== lieu ? region : ""].filter(Boolean).join(" – ");
+  const lieuTxt = lieu;
+  const regionNational = norm(region).includes("national");
+  const regionLabel = regionNational ? "National" : region;
 
   return `
     <article class="card" data-id="${r.id}">
       <div class="card-tags">
         ${modalite ? `<span class="fr-tag">${esc(modalite)}</span>` : ""}
-        <span class="fr-tag ${national ? "fr-tag--darkblue" : "fr-tag--green"}">${national ? "National" : "Régional"}</span>
-        ${organisme ? `<span class="fr-tag fr-tag--blue">${esc(organisme)}</span>` : ""}
+        ${regionLabel ? `<span class="fr-tag ${regionNational ? "fr-tag--darkblue" : "fr-tag--green"}">${esc(regionLabel)}</span>` : ""}
       </div>
       ${lien ? `<a class="card-title" href="${esc(lien)}" target="_blank" rel="noopener">${esc(titre)}</a>`
              : `<span class="card-title">${esc(titre)}</span>`}
