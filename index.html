@@ -209,24 +209,24 @@ let searchDebounce = null;
 // ---------- GRIST ----------
 grist.ready({
   columns: [
-    { name: "Libelle",    title: "Libellé (titre du stage)" },
-    { name: "Stage",      title: "N° stage", optional: true },
-    { name: "Session",    title: "Code session", optional: true },
+    { name: "Libelle",    title: "Libellé" },
+    { name: "Stage",      title: "Stage", optional: true },
+    { name: "Session",    title: "Session", optional: true },
     { name: "Places",     title: "Participants maximum", optional: true },
     { name: "Etat",       title: "Etat de la période", optional: true },
     { name: "Lieu",       title: "Lieu de formation", optional: true },
-    { name: "Modalite",   title: "Modalité du stage", optional: true },
-    { name: "Region",     title: "Code du lieu (région)", optional: true },
+    { name: "Modalite",   title: "Modalite du stage", optional: true },
+    { name: "Region",     title: "Code du lieu", optional: true },
     { name: "DateDebut",  title: "Date de début", optional: true },
     { name: "HeureDebut", title: "Heure de début", optional: true },
     { name: "DateFin",    title: "Date de fin", optional: true },
     { name: "HeureFin",   title: "Heure de fin", optional: true },
     { name: "Lien",       title: "Lien Formco", optional: true },
-    { name: "Public",     title: "Public (choix multiple)", optional: true },
-    { name: "Emploi",     title: "Emploi (choix multiple)", optional: true },
-    { name: "Discipline", title: "Discipline (choix multiple)", optional: true },
-    { name: "Thematique", title: "Thématique", optional: true },
-    { name: "Organisme",  title: "Code ENA (organisme)", optional: true },
+    { name: "Public",     title: "Public", optional: true },
+    { name: "Emploi",     title: "Emploi", optional: true },
+    { name: "Discipline", title: "Discipline", optional: true },
+    { name: "Thematique", title: "Thematique", optional: true },
+    { name: "Organisme",  title: "Code ENA", optional: true },
     { name: "OuvertureInscr", title: "Ouverture inscriptions", optional: true },
     { name: "ClotureInscr",   title: "Clôture inscriptions", optional: true },
   ],
@@ -327,7 +327,7 @@ function matchesFilters(record, ignoreKey) {
 
 function renderFilters() {
   const container = document.getElementById("filtersContainer");
-  container.innerHTML = FILTERS.filter(f => mappedCols[f.key]).map(f => {
+  container.innerHTML = FILTERS.map(f => {
     // compteurs calculés sur les résultats filtrés par les AUTRES volets (facettes)
     const counts = {};
     allRecords.forEach(r => {
@@ -350,7 +350,7 @@ function renderFilters() {
             <label class="filter-option">
               <input type="checkbox" data-key="${f.key}" value="${esc(value)}" ${activeFilters[f.key].has(value) ? "checked" : ""}>
               <span>${esc(value)} <span class="n">(${count})</span></span>
-            </label>`).join("") : `<div class="filter-empty">Aucune valeur</div>`}
+            </label>`).join("") : `<div class="filter-empty">${mappedCols[f.key] ? "Aucune valeur" : "Colonne à associer dans le panneau de droite"}</div>`}
         </div>
       </details>`;
   }).join("");
