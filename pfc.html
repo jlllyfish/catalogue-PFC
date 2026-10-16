@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Catalogue PFC - Widget Grist</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@gouvfr/dsfr@1.13.1/dist/dsfr.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css">
+<script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Marianne", arial, sans-serif; background: #fff; color: #161616; }
+
+  .header-band { background: #fff; border-bottom: 1px solid #E5E5E5; padding: 16px 32px; }
+  .header-inner { display: flex; align-items: center; gap: 32px; }
+
+  .header-brand { display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; }
+  .header-brand img { height: 100px; width: auto; }
+
+  .header-titles { flex: 1; min-width: 0; }
+  .header-titles h1 { margin: 0 0 6px; font-size: 1.5rem; line-height: 1.2; }
+  .header-titles p { margin: 0 0 4px; color: #3A3A3A; font-size: .8rem; line-height: 1.35; }
+
+  .search-bar { display: flex; gap: 6px; width: 260px; flex-shrink: 0; }
+  .search-bar input { flex: 1; padding: 8px 12px; border: 1px solid #DDD; border-radius: 4px; font-size: .9rem; min-width: 0; }
+  .search-bar button {
+    display: flex; align-items: center; justify-content: center;
+    background: #000091; color: #fff; border: none; border-radius: 4px;
+    width: 40px; flex-shrink: 0; cursor: pointer;
+  }
+  .search-bar button:hover { background: #1212FF; }
+
+  .layout { display: flex; gap: 32px; padding: 24px 32px; align-items: flex-start; }
+  .sidebar {
+    width: 280px; flex-shrink: 0;
+    position: sticky; top: 16px; align-self: flex-start;
+    max-height: calc(100vh - 32px); overflow-y: auto; padding-right: 4px;
+  }
+  .results-count { font-size: 1.5rem; font-weight: 700; margin: 0 0 16px; }
+
+  .filter-group { border-bottom: 1px solid #E5E5E5; }
+  .filter-group summary {
+    cursor: pointer; padding: 12px 0; font-weight: 600; color: #000091; text-transform: uppercase; font-size: .9rem;
+    list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  }
+  .filter-group summary::-webkit-details-marker { display: none; }
+  .filter-group summary::after { content: "\ea4e"; font-family: remixicon; font-weight: 400; transition: transform .2s; }
+  .filter-group[open] summary::after { transform: rotate(180deg); }
+  .filter-group summary .count-active {
+    margin-left: auto; background: #000091; color: #fff; border-radius: 999px;
+    font-size: .7rem; padding: 0 7px; line-height: 1.5; text-transform: none;
+  }
+  .filter-search {
+    width: 100%; padding: 6px 10px; margin: 0 0 6px; border: 1px solid #DDD; border-radius: 4px; font-size: .85rem;
+  }
+  .filter-options { padding-bottom: 8px; }
+  .filter-options.scroll { max-height: 280px; overflow-y: auto; }
+  .filter-option { display: flex; align-items: flex-start; gap: 8px; padding: 5px 0; font-size: .9rem; line-height: 1.3; cursor: pointer; }
+  .filter-option input { margin: 3px 0 0; flex-shrink: 0; }
+  .filter-option .n { color: #666; }
+  .filter-empty { font-size: .85rem; color: #666; padding: 4px 0; }
+
+  .results-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+
+  .active-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+  .active-filters:empty { display: none; }
+  .reset-filters {
+    background: none !important; border: none; color: #000091; font-size: .8rem; text-decoration: underline;
+    cursor: pointer; padding: 6px 4px; font-family: inherit;
+  }
+
+  .back-to-top {
+    position: fixed; right: 24px; bottom: 24px; z-index: 50;
+    display: none; align-items: center; gap: 6px;
+    background: #fff !important; color: #000091 !important;
+    border: 1px solid #000091; border-radius: 0; padding: 8px 14px;
+    font-family: inherit; font-size: .875rem; font-weight: 500; cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,18,.16) !important;
+  }
+  .back-to-top.visible { display: inline-flex; }
+  .back-to-top:hover, .back-to-top:focus { background: #F5F5FE !important; }
+  .tag-dismiss {
+    display: inline-flex; align-items: center; gap: 6px; text-align: left;
+    background: #000091 !important; color: #fff !important; border: none; border-radius: 999px;
+    padding: 6px 10px 6px 14px; font-size: .8rem; font-family: inherit; cursor: pointer;
+    box-shadow: none !important;
+  }
+  .tag-dismiss:hover, .tag-dismiss:focus { background: #1212FF !important; }
+  .tag-dismiss i { font-size: 15px; }
+
+  .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px; }
+
+  .card {
+    border: 1px solid #E5E5E5; padding: 16px; display: flex; flex-direction: column; gap: 8px;
+    transition: background-color .15s;
+  }
+  .card:hover { background-color: #F6F6F6; }
+  .card-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+  .fr-tag { font-size: .68rem; background: #EEE; padding: 2px 10px; }
+  .fr-tag--blue { background: #E3E3FD; color: #000091; }
+  .fr-tag--green { background: #B8FEC9; color: #18753C; }
+  .fr-tag--darkblue { background: #000091; color: #fff; }
+  .card-title {
+    color: #000091 !important; font-weight: 700; font-size: 1.05rem; text-decoration: none !important;
+    display: inline-block; border-bottom: 2px solid #000091; padding-bottom: 3px; width: fit-content;
+    box-shadow: none !important; background-image: none !important;
+  }
+  .card-info { display: grid; grid-template-columns: 1fr auto; gap: 2px 16px; font-size: .85rem; color: #3A3A3A; }
+  .card-info .code { font-weight: 700; color: #161616; }
+  .card-info .right { text-align: right; }
+  .card-meta { display: flex; align-items: center; gap: 6px; font-size: .85rem; color: #3A3A3A; }
+  .card-meta i { color: #000091; }
+  .card-chips { display: flex; flex-wrap: wrap; gap: 4px; font-size: .75rem; color: #3A3A3A; }
+  .card-chips b { font-weight: 600; margin-right: 2px; }
+
+  .badge { font-size: .75rem; font-weight: 600; padding: 2px 10px; border-radius: 2px; width: fit-content; }
+  .badge--success { background: #B8FEC9; color: #18753C; }
+  .badge--error { background: #FFE9E9; color: #CE0500; }
+  .badge--warning { background: #FFECC8; color: #B34000; }
+
+  .card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: auto; padding-top: 4px; }
+  .card-footer a { color: #000091; font-size: .85rem; }
+
+  .empty-state { color: #666; padding: 40px; text-align: center; grid-column: 1 / -1; }
+
+  @media (max-width: 768px) {
+    .header-band { padding: 16px 20px; }
+    .header-inner { flex-wrap: wrap; gap: 12px; }
+    .header-titles { order: 1; flex-basis: 100%; }
+    .header-titles h1 { font-size: 1.3rem; }
+    .header-brand { order: 0; }
+    .search-bar { order: 2; width: 100%; }
+    .layout { flex-direction: column; padding: 16px 20px; gap: 20px; }
+    .sidebar { width: 100%; position: static; max-height: none; overflow: visible; padding-right: 0; }
+    .cards-grid { grid-template-columns: 1fr; gap: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header-band">
+  <div class="header-inner">
+    <div class="header-brand">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/3/30/Logo_ministere.png" alt="Logo Ministère">
+    </div>
+    <div class="header-titles">
+      <h1>Catalogue PFC</h1>
+      <p>Ce catalogue de l’offre de stages piloté par la DGER vous donne accès aux formations qui auront lieu de septembre 2026 à juillet 2027. Il vous permet de retrouver l’ensemble des stages proposés aux agents de l’enseignement agricole. Bonne navigation !</p>
+      <p>Pour les stages organisés au niveau national qui auront lieu entre le 01/01/27 et le 31/07/27, la période d’inscription est du 18/06/26 au 30/11/26. Les stages organisés au niveau régional arriveront d’ici la fin d’année 2026.</p>
+      <p>Pour s’inscrire, les agents ayant accès à « Mon Self Mobile » passent par cette application. Pour les autres agents, le lien d’inscription est sur le détail du stage.</p>
+    </div>
+    <div class="search-bar">
+      <input id="searchInput" type="text" placeholder="Rechercher" aria-label="Rechercher un stage">
+      <button id="searchBtn" aria-label="Lancer la recherche"><i class="ri-search-line"></i></button>
+    </div>
+  </div>
+</div>
+
+<div class="layout">
+  <aside class="sidebar">
+    <p class="results-count"><span id="resultsCount">0</span> résultats</p>
+    <div class="active-filters" id="activeFiltersRow"></div>
+    <p style="font-weight:700; margin-bottom:8px;">Affinez votre recherche :</p>
+    <div id="filtersContainer"></div>
+  </aside>
+
+  <div class="results-col">
+    <main class="cards-grid" id="cardsGrid">
+      <div class="empty-state">En attente de connexion à Grist…</div>
+    </main>
+  </div>
+</div>
+
+<button type="button" class="back-to-top" id="backToTop" aria-label="Retour en haut de page">
+  <i class="ri-arrow-up-line"></i> Haut de page
+</button>
+
+<script>
+// ---------- CONFIGURATION ----------
+// Dates d'inscription affichées par défaut pour les stages nationaux (code stage commençant par "N")
+// dont la date de début tombe dans la période indiquée, si les colonnes
+// "Ouverture inscriptions" / "Clôture inscriptions" ne sont pas mappées.
+const INSCRIPTIONS_NATIONAL = {
+  ouverture: "18/06/26", cloture: "30/11/26",
+  stagesDu: new Date(2027, 0, 1), stagesAu: new Date(2027, 6, 31),
+};
+
+// Volets de filtres du panneau gauche, dans l'ordre d'affichage.
+// multi: true = colonne "Choix multiple" -> chaque valeur est un item séparé.
+const FILTERS = [
+  { key: "Public",     label: "Public",            multi: true },
+  { key: "Libelle",    label: "Libellé" },
+  { key: "Modalite",   label: "Modalité du stage" },
+  { key: "Lieu",       label: "Lieu" },
+  { key: "Discipline", label: "Discipline",        multi: true },
+  { key: "Emploi",     label: "Emploi",            multi: true },
+  { key: "Thematique", label: "Thématique",        multi: true },
+];
+const SEARCHABLE_FILTER_MIN = 8; // au-delà de N options, une mini-recherche apparaît dans le volet
+
+// ---------- ETAT ----------
+let allRecords = [];
+let mappedCols = {};
+const activeFilters = Object.fromEntries(FILTERS.map(f => [f.key, new Set()]));
+const openGroups = new Set();
+const groupSearch = {};
+let searchTerm = "";
+let searchDebounce = null;
+
+// ---------- GRIST ----------
+grist.ready({
+  columns: [
+    { name: "Libelle",    title: "Libellé (titre du stage)" },
+    { name: "Stage",      title: "N° stage", optional: true },
+    { name: "Session",    title: "Code session", optional: true },
+    { name: "Places",     title: "Participants maximum", optional: true },
+    { name: "Etat",       title: "Etat de la période", optional: true },
+    { name: "Lieu",       title: "Lieu de formation", optional: true },
+    { name: "Modalite",   title: "Modalité du stage", optional: true },
+    { name: "Region",     title: "Code du lieu (région)", optional: true },
+    { name: "DateDebut",  title: "Date de début", optional: true },
+    { name: "HeureDebut", title: "Heure de début", optional: true },
+    { name: "DateFin",    title: "Date de fin", optional: true },
+    { name: "HeureFin",   title: "Heure de fin", optional: true },
+    { name: "Lien",       title: "Lien Formco", optional: true },
+    { name: "Public",     title: "Public (choix multiple)", optional: true },
+    { name: "Emploi",     title: "Emploi (choix multiple)", optional: true },
+    { name: "Discipline", title: "Discipline (choix multiple)", optional: true },
+    { name: "Thematique", title: "Thématique", optional: true },
+    { name: "Organisme",  title: "Code ENA (organisme)", optional: true },
+    { name: "OuvertureInscr", title: "Ouverture inscriptions", optional: true },
+    { name: "ClotureInscr",   title: "Clôture inscriptions", optional: true },
+  ],
+  requiredAccess: "read table"
+});
+
+grist.onRecords((records, mappings) => {
+  mappedCols = mappings || {};
+  allRecords = records.map(r => ({ raw: r, _date: toDate(col(r, "DateDebut")) }));
+  allRecords.sort((a, b) => (a._date ? a._date.getTime() : Infinity) - (b._date ? b._date.getTime() : Infinity));
+  // retire les filtres actifs dont la valeur n'existe plus
+  FILTERS.forEach(f => {
+    const existing = new Set(allRecords.flatMap(r => values(r.raw, f.key)));
+    activeFilters[f.key].forEach(v => { if (!existing.has(v)) activeFilters[f.key].delete(v); });
+  });
+  render();
+});
+
+// ---------- HELPERS ----------
+function col(record, logicalName) {
+  const real = mappedCols[logicalName];
+  return real ? record[real] : undefined;
+}
+
+// Renvoie toujours une liste d'items (gère Choix multiple, texte "a, b", valeur simple).
+function values(record, logicalName) {
+  let v = col(record, logicalName);
+  if (v === null || v === undefined || v === "") return [];
+  if (Array.isArray(v)) {
+    if (v[0] === "L") v = v.slice(1); // format encodé Grist
+    return v.map(x => String(x).trim()).filter(Boolean);
+  }
+  v = String(v);
+  const f = FILTERS.find(x => x.key === logicalName);
+  if (f && f.multi) return v.split(",").map(x => x.trim()).filter(Boolean);
+  return [v.trim()].filter(Boolean);
+}
+
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function norm(s) {
+  return String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
+
+function toDate(v) {
+  if (v === null || v === undefined || v === "") return null;
+  if (v instanceof Date) return isNaN(v) ? null : v;
+  if (typeof v === "number") return new Date(v * 1000); // timestamp Grist (secondes)
+  const s = String(v).trim();
+  let m = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/); // 16-03-2027
+  if (m) return new Date(+m[3], +m[2] - 1, +m[1]);
+  m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);                 // 2027-03-16
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+  return null;
+}
+function formatDate(v) {
+  const d = toDate(v);
+  if (!d) return v ? String(v) : "";
+  return d.toLocaleDateString("fr-FR");
+}
+function formatHeure(v) {
+  if (v === null || v === undefined || v === "") return "";
+  if (typeof v === "number") { // durée Grist en secondes
+    const h = Math.floor(v / 3600), mn = Math.round((v % 3600) / 60);
+    return `${h}h${String(mn).padStart(2, "0")}`;
+  }
+  const m = String(v).match(/^(\d{1,2})[:h](\d{2})/);
+  return m ? `${+m[1]}h${m[2]}` : String(v);
+}
+
+function isNational(record) {
+  const code = String(col(record, "Stage") || "").trim().toUpperCase();
+  if (code) return code.startsWith("N");
+  return norm(col(record, "Region")).includes("national");
+}
+
+// ---------- FILTRES ----------
+function matchesFilters(record, ignoreKey) {
+  for (const f of FILTERS) {
+    if (f.key === ignoreKey) continue;
+    const sel = activeFilters[f.key];
+    if (sel.size === 0) continue;
+    if (!values(record, f.key).some(v => sel.has(v))) return false;
+  }
+  if (searchTerm) {
+    const haystack = norm([
+      col(record, "Libelle"), col(record, "Stage"), col(record, "Session"),
+      col(record, "Lieu"), col(record, "Modalite"), col(record, "Region"), col(record, "Organisme"),
+      ...values(record, "Public"), ...values(record, "Emploi"),
+      ...values(record, "Discipline"), ...values(record, "Thematique"),
+    ].filter(Boolean).join(" | "));
+    const words = norm(searchTerm).split(/\s+/).filter(Boolean);
+    if (!words.every(w => haystack.includes(w))) return false;
+  }
+  return true;
+}
+
+function renderFilters() {
+  const container = document.getElementById("filtersContainer");
+  container.innerHTML = FILTERS.filter(f => mappedCols[f.key]).map(f => {
+    // compteurs calculés sur les résultats filtrés par les AUTRES volets (facettes)
+    const counts = {};
+    allRecords.forEach(r => {
+      if (!matchesFilters(r.raw, f.key)) return;
+      new Set(values(r.raw, f.key)).forEach(v => counts[v] = (counts[v] || 0) + 1);
+    });
+    activeFilters[f.key].forEach(v => { if (!(v in counts)) counts[v] = 0; });
+    const entries = Object.entries(counts).sort((a, b) => a[0].localeCompare(b[0], "fr"));
+    const withSearch = entries.length > SEARCHABLE_FILTER_MIN;
+    const q = norm(groupSearch[f.key] || "");
+    const shown = q ? entries.filter(([v]) => norm(v).includes(q)) : entries;
+    const nActive = activeFilters[f.key].size;
+
+    return `
+      <details class="filter-group" data-key="${f.key}" ${openGroups.has(f.key) ? "open" : ""}>
+        <summary>${esc(f.label)}${nActive ? `<span class="count-active">${nActive}</span>` : ""}</summary>
+        ${withSearch ? `<input class="filter-search" type="search" data-key="${f.key}" placeholder="Filtrer la liste…" value="${esc(groupSearch[f.key] || "")}" aria-label="Filtrer la liste ${esc(f.label)}">` : ""}
+        <div class="filter-options ${withSearch ? "scroll" : ""}">
+          ${shown.length ? shown.map(([value, count]) => `
+            <label class="filter-option">
+              <input type="checkbox" data-key="${f.key}" value="${esc(value)}" ${activeFilters[f.key].has(value) ? "checked" : ""}>
+              <span>${esc(value)} <span class="n">(${count})</span></span>
+            </label>`).join("") : `<div class="filter-empty">Aucune valeur</div>`}
+        </div>
+      </details>`;
+  }).join("");
+
+  container.querySelectorAll("details").forEach(d => d.addEventListener("toggle", () => {
+    d.open ? openGroups.add(d.dataset.key) : openGroups.delete(d.dataset.key);
+  }));
+  container.querySelectorAll("input[type=checkbox]").forEach(cb => cb.addEventListener("change", e => {
+    const set = activeFilters[e.target.dataset.key];
+    e.target.checked ? set.add(e.target.value) : set.delete(e.target.value);
+    render();
+  }));
+  container.querySelectorAll(".filter-search").forEach(inp => inp.addEventListener("input", e => {
+    const key = e.target.dataset.key, pos = e.target.selectionStart;
+    groupSearch[key] = e.target.value;
+    renderFilters();
+    const again = container.querySelector(`.filter-search[data-key="${key}"]`);
+    again.focus(); again.setSelectionRange(pos, pos);
+  }));
+}
+
+function renderActiveFilters() {
+  const container = document.getElementById("activeFiltersRow");
+  const tags = FILTERS.flatMap(f => [...activeFilters[f.key]].map(value => ({ f, value })));
+  if (!tags.length) { container.innerHTML = ""; return; }
+  container.innerHTML = tags.map(({ f, value }) => `
+    <button class="tag-dismiss" type="button" data-key="${f.key}" data-value="${esc(value)}" aria-label="Retirer le filtre ${esc(f.label)} : ${esc(value)}">
+      ${esc(value)} <i class="ri-close-line"></i>
+    </button>`).join("") + (tags.length > 1 ? `<button class="reset-filters" type="button" id="resetFilters">Tout effacer</button>` : "");
+
+  container.querySelectorAll(".tag-dismiss").forEach(btn => btn.addEventListener("click", () => {
+    activeFilters[btn.dataset.key].delete(btn.dataset.value);
+    render();
+  }));
+  const reset = document.getElementById("resetFilters");
+  if (reset) reset.addEventListener("click", () => { FILTERS.forEach(f => activeFilters[f.key].clear()); render(); });
+}
+
+// ---------- CARTES ----------
+function cardHTML(r) {
+  const titre = col(r, "Libelle") || "(sans titre)";
+  const stage = col(r, "Stage") || "";
+  const session = col(r, "Session") || "";
+  const places = col(r, "Places");
+  const modalite = col(r, "Modalite") || "";
+  const lieu = col(r, "Lieu") || "";
+  const region = col(r, "Region") || "";
+  const organisme = col(r, "Organisme") || "";
+  const lien = col(r, "Lien") || "";
+  const etat = col(r, "Etat") || "";
+  const national = isNational(r);
+
+  const debut = formatDate(col(r, "DateDebut"));
+  const hDebut = formatHeure(col(r, "HeureDebut"));
+  const fin = formatDate(col(r, "DateFin"));
+  const hFin = formatHeure(col(r, "HeureFin"));
+
+  let ouv = formatDate(col(r, "OuvertureInscr"));
+  let clo = formatDate(col(r, "ClotureInscr"));
+  const dDebut = toDate(col(r, "DateDebut"));
+  const I = INSCRIPTIONS_NATIONAL;
+  if (!ouv && !clo && national && dDebut && dDebut >= I.stagesDu && dDebut <= I.stagesAu) {
+    ouv = I.ouverture; clo = I.cloture;
+  }
+
+  const etatN = norm(etat);
+  const badgeClass = etatN.includes("ouvert") ? "badge--success"
+    : (etatN.includes("ferme") || etatN.includes("clos") || etatN.includes("annul") || etatN.includes("complet")) ? "badge--error"
+    : etatN ? "badge--warning" : "";
+
+  const chips = [
+    ["Public", values(r, "Public")],
+    ["Thématique", values(r, "Thematique")],
+  ].filter(([, v]) => v.length)
+   .map(([k, v]) => `<div><b>${k} :</b>${esc(v.join(", "))}</div>`).join("");
+
+  const lieuTxt = [lieu, region && region !== lieu ? region : ""].filter(Boolean).join(" – ");
+
+  return `
+    <article class="card" data-id="${r.id}">
+      <div class="card-tags">
+        ${modalite ? `<span class="fr-tag">${esc(modalite)}</span>` : ""}
+        <span class="fr-tag ${national ? "fr-tag--darkblue" : "fr-tag--green"}">${national ? "National" : "Régional"}</span>
+        ${organisme ? `<span class="fr-tag fr-tag--blue">${esc(organisme)}</span>` : ""}
+      </div>
+      ${lien ? `<a class="card-title" href="${esc(lien)}" target="_blank" rel="noopener">${esc(titre)}</a>`
+             : `<span class="card-title">${esc(titre)}</span>`}
+      <div class="card-info">
+        <span class="code">${esc([stage, session].filter(Boolean).join(" - "))}</span>
+        <span class="right">${places !== undefined && places !== null && places !== "" ? `Nombre de places : ${esc(places)}` : ""}</span>
+        <span>${debut ? `Date de début : ${esc(debut)}${hDebut ? " à " + esc(hDebut) : ""}` : ""}</span>
+        <span class="right">${fin ? `Date de fin : ${esc(fin)}${hFin ? " à " + esc(hFin) : ""}` : ""}</span>
+      </div>
+      ${lieuTxt ? `<div class="card-meta"><i class="ri-map-pin-line"></i><span>${esc(lieuTxt)}</span></div>` : ""}
+      ${chips ? `<div class="card-chips" style="flex-direction:column">${chips}</div>` : ""}
+      ${etat ? `<span class="badge ${badgeClass}">${esc(etat)}</span>` : ""}
+      ${ouv ? `<div class="card-meta"><i class="ri-calendar-line"></i><span>Ouverture des inscriptions : ${esc(ouv)}</span></div>` : ""}
+      ${clo ? `<div class="card-meta"><i class="ri-calendar-line"></i><span>Clôture des inscriptions : ${esc(clo)}</span></div>` : ""}
+      <div class="card-footer">
+        ${lien ? `<a href="${esc(lien)}" target="_blank" rel="noopener">Détail et inscription <i class="ri-external-link-line"></i></a>` : "<span></span>"}
+      </div>
+    </article>`;
+}
+
+function render() {
+  const grid = document.getElementById("cardsGrid");
+  const filtered = allRecords.filter(r => matchesFilters(r.raw));
+  document.getElementById("resultsCount").textContent = filtered.length;
+  renderActiveFilters();
+  renderFilters();
+
+  if (!filtered.length) {
+    grid.innerHTML = `<div class="empty-state">Aucun stage ne correspond à cette recherche.</div>`;
+    return;
+  }
+  grid.innerHTML = filtered.map(r => cardHTML(r.raw)).join("");
+  grid.querySelectorAll(".card").forEach(el => el.addEventListener("click", e => {
+    if (e.target.closest("a")) return;
+    grist.setCursorPos({ rowId: Number(el.dataset.id) });
+  }));
+}
+
+// ---------- RECHERCHE ----------
+document.getElementById("searchInput").addEventListener("input", e => {
+  clearTimeout(searchDebounce);
+  const value = e.target.value;
+  searchDebounce = setTimeout(() => { searchTerm = value; render(); }, 200);
+});
+document.getElementById("searchBtn").addEventListener("click", () => {
+  searchTerm = document.getElementById("searchInput").value;
+  render();
+});
+
+// ---------- HAUT DE PAGE ----------
+(function () {
+  const btn = document.getElementById("backToTop");
+  const toggle = () => btn.classList.toggle("visible", (window.scrollY || document.documentElement.scrollTop) > 300);
+  window.addEventListener("scroll", toggle, { passive: true });
+  btn.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "auto" }));
+  toggle();
+})();
+</script>
+
+</body>
+</html>
