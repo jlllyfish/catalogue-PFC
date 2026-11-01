@@ -188,8 +188,8 @@
 // Le document doit être partagé en lecture publique. Surchargeable par l'URL : ?doc=…&table=…&server=…
 const PUBLIC_SOURCE = {
   server: "https://grist.numerique.gouv.fr",
-  doc: "",    // ID du document (après /o/srfd-occ/ dans l'URL)
-  table: "",  // ID de la table (nom dans « Données brutes »)
+  doc: "uTohqnaWqzd8G82pv7wPzQ",          // ID du document (après /o/srfd-occ/ dans l'URL)
+  table: "PFC 2027-Catalogue_2026_2027",   // nom ou ID de la table (« Données brutes »)
 };
 // Dates d'inscription affichées par défaut pour les stages nationaux (code stage commençant par "N")
 // dont la date de début tombe dans la période indiquée, si les colonnes
@@ -275,8 +275,18 @@ async function loadFromPublicApi() {
 
   const grid = document.getElementById("cardsGrid");
   grid.innerHTML = `<div class="empty-state">Chargement du catalogue…</div>`;
-  const base = `${server}/api/docs/${encodeURIComponent(doc)}/tables/${encodeURIComponent(table)}`;
   try {
+    // le nom affiché est converti en ID Grist (ex. « PFC 2027-Catalogue » -> PFC_2027_Catalogue) ;
+    // en dernier recours on cherche la table dans la liste du document
+    const key = t => String(t).replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "").toLowerCase();
+    let tableId = String(table).replace(/[^A-Za-z0-9_]+/g, "_").replace(/^_+|_+$/g, "");
+    const tRes = await fetch(`${server}/api/docs/${encodeURIComponent(doc)}/tables`);
+    if (tRes.ok) {
+      const { tables } = await tRes.json();
+      const found = (tables || []).find(t => t.id === tableId || key(t.id) === key(table));
+      if (found) tableId = found.id;
+    }
+    const base = `${server}/api/docs/${encodeURIComponent(doc)}/tables/${encodeURIComponent(tableId)}`;
     const [colsRes, recsRes] = await Promise.all([fetch(`${base}/columns`), fetch(`${base}/records`)]);
     if (!colsRes.ok || !recsRes.ok) throw new Error(`HTTP ${colsRes.status}/${recsRes.status}`);
     const { columns } = await colsRes.json();
