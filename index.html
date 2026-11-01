@@ -45,7 +45,7 @@
 
   .filter-group { border-bottom: 1px solid #E5E5E5; }
   .filter-group summary {
-    cursor: pointer; padding: 12px 0; font-weight: 600; color: #000091; text-transform: uppercase; font-size: .9rem;
+    cursor: pointer; padding: 12px 0; font-weight: 600; color: #000091; font-size: .95rem;
     list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 8px;
   }
   .filter-group summary::-webkit-details-marker { display: none; }
@@ -163,7 +163,7 @@
   <aside class="sidebar">
     <p class="results-count"><span id="resultsCount">0</span> résultats</p>
     <div class="search-bar">
-      <input id="searchInput" type="text" placeholder="Rechercher" aria-label="Rechercher un stage">
+      <input id="searchInput" type="text" placeholder="Libellé ou code du stage" aria-label="Rechercher par libellé ou code du stage">
       <button id="searchBtn" aria-label="Lancer la recherche"><i class="ri-search-line"></i></button>
     </div>
     <div class="active-filters" id="activeFiltersRow"></div>
@@ -197,6 +197,7 @@ const INSCRIPTIONS_NATIONAL = {
 const FILTERS = [
   { key: "Public",     label: "Public",            multi: true },
   { key: "Modalite",   label: "Modalité du stage" },
+  { key: "Mois",       label: "Mois", source: "DateDebut", chrono: true },
   { key: "Lieu",       label: "Lieu" },
   { key: "Discipline", label: "Discipline",        multi: true },
   { key: "Emploi",     label: "Emploi",            multi: true },
@@ -258,8 +259,21 @@ function col(record, logicalName) {
   return real ? record[real] : undefined;
 }
 
+// Mois de début du stage, ex. « Mars 2027 » (filtre Mois).
+const MONTH_ORDER = {}; // libellé du mois -> rang chronologique
+function monthLabel(record) {
+  const d = toDate(col(record, "DateDebut"));
+  if (!d) return [];
+  const m = d.toLocaleDateString("fr-FR", { month: "long" });
+  const label = m.charAt(0).toUpperCase() + m.slice(1) + " " + d.getFullYear();
+  MONTH_ORDER[label] = d.getFullYear() * 12 + d.getMonth();
+  return [label];
+}
+function isMapped(f) { return !!mappedCols[f.source || f.key]; }
+
 // Renvoie toujours une liste d'items (gère Choix multiple, texte "a, b", valeur simple).
 function values(record, logicalName) {
+  if (logicalName === "Mois") return monthLabel(record);
   let v = col(record, logicalName);
   if (v === null || v === undefined || v === "") return [];
   if (Array.isArray(v)) {
@@ -320,12 +334,7 @@ function matchesFilters(record, ignoreKey) {
     if (!values(record, f.key).some(v => sel.has(v))) return false;
   }
   if (searchTerm) {
-    const haystack = norm([
-      col(record, "Libelle"), col(record, "Stage"), col(record, "Session"),
-      col(record, "Lieu"), col(record, "Modalite"), col(record, "Region"), col(record, "Organisme"),
-      ...values(record, "Public"), ...values(record, "Emploi"),
-      ...values(record, "Discipline"), ...values(record, "Thematique"),
-    ].filter(Boolean).join(" | "));
+    const haystack = norm([col(record, "Libelle"), col(record, "Stage")].filter(Boolean).join(" | "));
     const words = norm(searchTerm).split(/\s+/).filter(Boolean);
     if (!words.every(w => haystack.includes(w))) return false;
   }
@@ -342,8 +351,10 @@ function renderFilters() {
       new Set(values(r.raw, f.key)).forEach(v => counts[v] = (counts[v] || 0) + 1);
     });
     activeFilters[f.key].forEach(v => { if (!(v in counts)) counts[v] = 0; });
-    const entries = Object.entries(counts).sort((a, b) => a[0].localeCompare(b[0], "fr"));
-    const withSearch = entries.length > SEARCHABLE_FILTER_MIN;
+    const entries = Object.entries(counts).sort((a, b) => f.chrono
+      ? (MONTH_ORDER[a[0]] ?? 0) - (MONTH_ORDER[b[0]] ?? 0)
+      : a[0].localeCompare(b[0], "fr"));
+    const withSearch = !f.chrono && entries.length > SEARCHABLE_FILTER_MIN;
     const q = norm(groupSearch[f.key] || "");
     const shown = q ? entries.filter(([v]) => norm(v).includes(q)) : entries;
     const nActive = activeFilters[f.key].size;
@@ -357,7 +368,7 @@ function renderFilters() {
             <label class="filter-option">
               <input type="checkbox" data-key="${f.key}" value="${esc(value)}" ${activeFilters[f.key].has(value) ? "checked" : ""}>
               <span>${esc(value)} <span class="n">(${count})</span></span>
-            </label>`).join("") : `<div class="filter-empty">${mappedCols[f.key] ? "Aucune valeur" : "Colonne à associer dans le panneau de droite"}</div>`}
+            </label>`).join("") : `<div class="filter-empty">${isMapped(f) ? "Aucune valeur" : "Colonne à associer dans le panneau de droite"}</div>`}
         </div>
       </details>`;
   }).join("");
