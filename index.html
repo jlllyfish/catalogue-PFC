@@ -246,12 +246,22 @@ const COLUMNS = [
 ];
 
 let gristDataReceived = false;
-grist.ready({ columns: COLUMNS, requiredAccess: "read table" });
 
-grist.onRecords((records, mappings) => {
-  gristDataReceived = true;
-  loadData(records, mappings);
-});
+// Hors de Grist, aucune donnée n'arrive par le widget : on bascule sur l'API publique.
+// Programmé AVANT les appels Grist pour qu'une erreur de l'API widget ne bloque pas ce repli.
+// Page ouverte directement -> immédiatement ; dans une iframe -> après un court délai.
+setTimeout(() => { if (!gristDataReceived) loadFromPublicApi(); }, window.self === window.top ? 0 : 1500);
+
+try {
+  grist.ready({ columns: COLUMNS, requiredAccess: "read table" });
+
+  grist.onRecords((records, mappings) => {
+    gristDataReceived = true;
+    loadData(records, mappings);
+  });
+} catch (e) {
+  console.warn("API widget Grist indisponible (page hors de Grist ?)", e);
+}
 
 function loadData(records, mappings) {
   mappedCols = mappings || {};
@@ -312,9 +322,6 @@ async function loadFromPublicApi() {
   return true;
 }
 
-// Hors de Grist, aucune donnée n'arrive par le widget : on bascule sur l'API publique.
-// Page ouverte directement -> immédiatement ; dans une iframe -> après un court délai.
-setTimeout(() => { if (!gristDataReceived) loadFromPublicApi(); }, window.self === window.top ? 0 : 1500);
 
 // ---------- HELPERS ----------
 function col(record, logicalName) {
@@ -557,7 +564,7 @@ function render() {
   grid.innerHTML = filtered.map(r => cardHTML(r.raw)).join("");
   grid.querySelectorAll(".card").forEach(el => el.addEventListener("click", e => {
     if (e.target.closest("a")) return;
-    grist.setCursorPos({ rowId: Number(el.dataset.id) });
+    try { grist.setCursorPos({ rowId: Number(el.dataset.id) }); } catch (e) { /* hors de Grist */ }
   }));
 }
 
