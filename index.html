@@ -184,6 +184,13 @@
 
 <script>
 // ---------- CONFIGURATION ----------
+// Mode autonome (page ouverte hors de Grist) : les données sont lues via l'API publique Grist.
+// Le document doit être partagé en lecture publique. Surchargeable par l'URL : ?doc=…&table=…&server=…
+const PUBLIC_SOURCE = {
+  server: "https://grist.numerique.gouv.fr",
+  doc: "uTohqnaWqzd8G82pv7wPzQ",          // ID du document (après /o/srfd-occ/ dans l'URL)
+  table: "PFC 2027-Catalogue_2026_2027",   // nom ou ID de la table (« Données brutes »)
+};
 // Dates d'inscription affichées par défaut pour les stages nationaux (code stage commençant par "N")
 // dont la date de début tombe dans la période indiquée, si les colonnes
 // "Ouverture inscriptions" / "Clôture inscriptions" ne sont pas mappées.
@@ -215,8 +222,7 @@ let searchTerm = "";
 let searchDebounce = null;
 
 // ---------- GRIST ----------
-grist.ready({
-  columns: [
+const COLUMNS = [
     { name: "Libelle",    title: "Libellé" },
     { name: "Stage",      title: "Stage", optional: true },
     { name: "Session",    title: "Session", optional: true },
@@ -237,11 +243,17 @@ grist.ready({
     { name: "Organisme",  title: "Code ENA", optional: true },
     { name: "OuvertureInscr", title: "Ouverture inscriptions", optional: true },
     { name: "ClotureInscr",   title: "Clôture inscriptions", optional: true },
-  ],
-  requiredAccess: "read table"
-});
+];
+
+let gristDataReceived = false;
+grist.ready({ columns: COLUMNS, requiredAccess: "read table" });
 
 grist.onRecords((records, mappings) => {
+  gristDataReceived = true;
+  loadData(records, mappings);
+});
+
+function loadData(records, mappings) {
   mappedCols = mappings || {};
   allRecords = records.map(r => ({ raw: r, _date: toDate(col(r, "DateDebut")) }));
   allRecords.sort((a, b) => (a._date ? a._date.getTime() : Infinity) - (b._date ? b._date.getTime() : Infinity));
@@ -251,7 +263,58 @@ grist.onRecords((records, mappings) => {
     activeFilters[f.key].forEach(v => { if (!existing.has(v)) activeFilters[f.key].delete(v); });
   });
   render();
-});
+}
+
+// ---------- MODE AUTONOME (API publique Grist) ----------
+async function loadFromPublicApi() {
+  const params = new URLSearchParams(location.search);
+  const server = (params.get("server") || PUBLIC_SOURCE.server).replace(/\/+$/, "");
+  const doc = params.get("doc") || PUBLIC_SOURCE.doc;
+  const table = params.get("table") || PUBLIC_SOURCE.table;
+  if (!doc || !table) return false;
+
+  const grid = document.getElementById("cardsGrid");
+  grid.innerHTML = `<div class="empty-state">Chargement du catalogue…</div>`;
+  try {
+    // le nom affiché est converti en ID Grist (ex. « PFC 2027-Catalogue » -> PFC_2027_Catalogue) ;
+    // en dernier recours on cherche la table dans la liste du document
+    const key = t => String(t).replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "").toLowerCase();
+    let tableId = String(table).replace(/[^A-Za-z0-9_]+/g, "_").replace(/^_+|_+$/g, "");
+    const tRes = await fetch(`${server}/api/docs/${encodeURIComponent(doc)}/tables`);
+    if (tRes.ok) {
+      const { tables } = await tRes.json();
+      const found = (tables || []).find(t => t.id === tableId || key(t.id) === key(table));
+      if (found) tableId = found.id;
+    }
+    const base = `${server}/api/docs/${encodeURIComponent(doc)}/tables/${encodeURIComponent(tableId)}`;
+    const [colsRes, recsRes] = await Promise.all([fetch(`${base}/columns`), fetch(`${base}/records`)]);
+    if (!colsRes.ok || !recsRes.ok) throw new Error(`HTTP ${colsRes.status}/${recsRes.status}`);
+    const { columns } = await colsRes.json();
+    const { records } = await recsRes.json();
+    if (gristDataReceived) return true; // Grist a répondu entre-temps : on garde ses données
+
+    // association automatique : libellé (ou ID) de colonne Grist == titre attendu par le widget
+    const byName = {};
+    columns.forEach(c => {
+      byName[norm(c.fields && c.fields.label)] = c.id;
+      byName[norm(c.id)] = c.id;
+    });
+    const mappings = {};
+    COLUMNS.forEach(c => {
+      const id = byName[norm(c.title)] || byName[norm(c.name)];
+      if (id) mappings[c.name] = id;
+    });
+    loadData(records.map(r => ({ id: r.id, ...r.fields })), mappings);
+  } catch (e) {
+    console.error("Catalogue PFC – lecture API Grist impossible :", e);
+    grid.innerHTML = `<div class="empty-state">Le catalogue n’a pas pu être chargé. Réessayez plus tard.</div>`;
+  }
+  return true;
+}
+
+// Hors de Grist, aucune donnée n'arrive par le widget : on bascule sur l'API publique.
+// Page ouverte directement -> immédiatement ; dans une iframe -> après un court délai.
+setTimeout(() => { if (!gristDataReceived) loadFromPublicApi(); }, window.self === window.top ? 0 : 1500);
 
 // ---------- HELPERS ----------
 function col(record, logicalName) {
